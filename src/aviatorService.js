@@ -1,3 +1,6 @@
+import fs from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import { chromium } from 'playwright';
 import { config } from './config.js';
 import { sendSnapshotToFirebase } from './firebase.js';
@@ -33,7 +36,13 @@ export class AviatorService {
 
     try {
       await this.launchBrowser();
-      await this.login();
+
+      const sessionReused = await this.tryReuseSession();
+      if (!sessionReused) {
+        await this.login();
+        await this.persistSession();
+      }
+
       await this.openAviator();
 
       this.startedAt = new Date().toISOString();
@@ -58,7 +67,14 @@ export class AviatorService {
         executablePath: config.browserExecutablePath,
         args: ['--no-sandbox', '--disable-setuid-sandbox']
       });
-      this.context = await this.browser.newContext();
+      const contextOptions = {};
+
+      if (config.sessionEnabled && config.sessionStatePath && existsSync(config.sessionStatePath)) {
+        contextOptions.storageState = config.sessionStatePath;
+        console.log(`🍪 Sessão carregada de ${config.sessionStatePath}`);
+      }
+
+      this.context = await this.browser.newContext(contextOptions);
       this.page = await this.context.newPage();
     } catch (error) {
       if (error.message?.includes("Executable doesn't exist") || error.message?.includes('Failed to launch')) {
@@ -68,6 +84,36 @@ export class AviatorService {
       }
       throw error;
     }
+  }
+
+  async tryReuseSession() {
+    if (!config.sessionEnabled) return false;
+
+    if (!config.sessionStatePath || !existsSync(config.sessionStatePath)) {
+      return false;
+    }
+
+    try {
+      await this.page.goto(config.casinoAviatorUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+
+      if (this.page.url().includes('/aviator')) {
+        console.log('🍪 Sessão reaproveitada com sucesso (sem novo login).');
+        return true;
+      }
+
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  async persistSession() {
+    if (!config.sessionEnabled || !config.sessionStatePath) return;
+
+    const sessionDir = path.dirname(config.sessionStatePath);
+    await fs.mkdir(sessionDir, { recursive: true });
+    await this.context.storageState({ path: config.sessionStatePath });
+    console.log(`💾 Sessão salva em ${config.sessionStatePath}`);
   }
 
   async login() {

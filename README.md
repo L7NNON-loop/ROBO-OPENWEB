@@ -101,6 +101,11 @@ FIREBASE_APP_ID=
 FIREBASE_MEASUREMENT_ID=
 ```
 
+### Sessão persistente (cookies/login)
+- `SESSION_ENABLED=true`: habilita reaproveitamento de sessão.
+- `SESSION_STATE_PATH=.session/state.json`: caminho do arquivo de sessão (cookies/localStorage) salvo pelo Playwright.
+- Quando a sessão estiver válida, o serviço reutiliza login automaticamente e evita novo login a cada restart.
+
 ---
 
 ## 4) APIs públicas

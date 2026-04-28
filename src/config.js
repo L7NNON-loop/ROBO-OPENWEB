@@ -32,6 +32,8 @@ export const config = {
 
   browserHeadless: parseBool(process.env.BROWSER_HEADLESS, true),
   browserExecutablePath: process.env.BROWSER_EXECUTABLE_PATH || undefined,
+  sessionEnabled: parseBool(process.env.SESSION_ENABLED, true),
+  sessionStatePath: process.env.SESSION_STATE_PATH || '.session/state.json',
 
   corsOrigin: process.env.CORS_ORIGIN || '*',
 
