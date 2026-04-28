@@ -88,48 +88,8 @@ export class AviatorService {
   }
 
   async openAviator() {
-    const maxAttempts = 3;
-
-    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-      try {
-        await this.page.goto(config.casinoAviatorUrl, { waitUntil: 'commit', timeout: 60000 });
-
-        await this.page.waitForURL((url) => url.href.includes('/aviator'), { timeout: 30000 }).catch(() => null);
-
-        if (this.page.url().includes('/aviator')) {
-          console.log(`🎰 Página do Aviator aberta (tentativa ${attempt}/${maxAttempts}).`);
-          return;
-        }
-      } catch (error) {
-        const isAborted = error.message?.includes('ERR_ABORTED');
-
-        if (!isAborted || attempt === maxAttempts) {
-          throw error;
-        }
-
-        console.warn(`⚠️ Navegação abortada para Aviator (tentativa ${attempt}/${maxAttempts}). Tentando novamente...`);
-      }
-
-      await this.page.waitForTimeout(2000);
-
-      if (this.page.url().includes('/aviator')) {
-        console.log(`🎰 Página do Aviator aberta (recuperada na tentativa ${attempt}/${maxAttempts}).`);
-        return;
-      }
-
-      await this.page.evaluate((aviatorUrl) => {
-        window.location.href = aviatorUrl;
-      }, config.casinoAviatorUrl).catch(() => null);
-
-      await this.page.waitForURL((url) => url.href.includes('/aviator'), { timeout: 30000 }).catch(() => null);
-
-      if (this.page.url().includes('/aviator')) {
-        console.log(`🎰 Página do Aviator aberta após fallback (tentativa ${attempt}/${maxAttempts}).`);
-        return;
-      }
-    }
-
-    throw new Error(`Não foi possível abrir a página do Aviator após ${maxAttempts} tentativas.`);
+    await this.page.goto(config.casinoAviatorUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    console.log('🎰 Página do Aviator aberta.');
   }
 
   async captureCycle() {
