@@ -140,6 +140,17 @@ Rota pública para integração entre sites.
 curl "http://localhost:3000/api/sites/requisicoes"
 ```
 
+### GET `/debug/logs?limit=200`
+Logs internos do bot organizados por etapas:
+- `1-CONEXAO`
+- `2-LOGIN`
+- `3-INJECTOR`
+- `4-CAPTURA`
+
+```bash
+curl "http://localhost:3000/debug/logs?limit=200"
+```
+
 ---
 
 ## 5) Deploy no Render

@@ -5,7 +5,20 @@ import { AviatorService } from './aviatorService.js';
 import { initFirebase } from './firebase.js';
 
 const app = express();
-const aviatorService = new AviatorService();
+const debugLogs = [];
+const MAX_DEBUG_LOGS = 1000;
+
+const appendDebugLog = (entry) => {
+  debugLogs.unshift(entry);
+  if (debugLogs.length > MAX_DEBUG_LOGS) {
+    debugLogs.length = MAX_DEBUG_LOGS;
+  }
+
+  const printer = entry.level === 'error' ? console.error : entry.level === 'warn' ? console.warn : console.log;
+  printer(`🧾 [${entry.stage}] ${entry.message}`);
+};
+
+const aviatorService = new AviatorService({ logHandler: appendDebugLog });
 
 app.use(cors({ origin: config.corsOrigin === '*' ? true : config.corsOrigin }));
 app.use(express.json());
@@ -31,7 +44,8 @@ app.get('/api/docs', (req, res) => {
       velas: 'GET /api/velas?limit=50',
       status: 'GET /api/status',
       docs: 'GET /api/docs',
-      sitesRequisicoes: 'GET /api/sites/requisicoes'
+      sitesRequisicoes: 'GET /api/sites/requisicoes',
+      debugLogs: 'GET /debug/logs?limit=200'
     }
   });
 });
@@ -45,6 +59,17 @@ app.get('/api/sites/requisicoes', (req, res) => {
       '/api/status',
       '/api/docs'
     ]
+  });
+});
+
+app.get('/debug/logs', (req, res) => {
+  const limit = Number(req.query.limit || 200);
+  const safeLimit = Number.isFinite(limit) ? Math.min(Math.max(limit, 1), MAX_DEBUG_LOGS) : 200;
+
+  return res.json({
+    ok: true,
+    total: debugLogs.length,
+    data: debugLogs.slice(0, safeLimit)
   });
 });
 

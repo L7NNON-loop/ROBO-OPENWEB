@@ -16,7 +16,7 @@ const FALLBACK_SELECTORS = [
 ];
 
 export class AviatorService {
-  constructor() {
+  constructor(options = {}) {
     this.browser = null;
     this.context = null;
     this.page = null;
@@ -30,22 +30,52 @@ export class AviatorService {
     this.lastCaptureAt = null;
     this.startedAt = null;
     this.injectorReady = false;
+    this.logHandler = options.logHandler || null;
+    this.sessionId = null;
+  }
+
+  emitLog(level, stage, message, meta = {}) {
+    const entry = {
+      timestamp: new Date().toISOString(),
+      level,
+      stage,
+      sessionId: this.sessionId,
+      message,
+      meta
+    };
+
+    if (this.logHandler) {
+      this.logHandler(entry);
+      return;
+    }
+
+    const printer = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
+    printer(`[${stage}] ${message}`);
   }
 
   async start() {
     if (this.isRunning) return;
 
     try {
+      this.sessionId = `sess-${Date.now()}`;
+      this.emitLog('info', '1-CONEXAO', 'Iniciando nova sessão do serviço.', {
+        casinoBaseUrl: config.casinoBaseUrl,
+        pollIntervalMs: config.pollIntervalMs
+      });
       await this.launchBrowser();
 
       const sessionReused = await this.tryReuseSession();
       if (!sessionReused) {
+        this.emitLog('info', '2-LOGIN', 'Sessão não reaproveitada. Iniciando login automático.');
         await this.login();
         await this.persistSession();
+      } else {
+        this.emitLog('info', '2-LOGIN', 'Sessão reaproveitada com sucesso.');
       }
 
       await this.openAviator();
       await this.setupInjector();
+      this.emitLog('info', '3-INJECTOR', 'Etapa de injeção finalizada.', { injectorReady: this.injectorReady });
 
       this.startedAt = new Date().toISOString();
       this.pollTimer = setInterval(() => {
@@ -54,9 +84,11 @@ export class AviatorService {
 
       await this.captureCycle();
       this.isRunning = true;
+      this.emitLog('info', '1-CONEXAO', 'Serviço iniciado e ciclo de captura ativo.');
       console.log(`✅ Captura iniciada. Intervalo: ${config.pollIntervalMs}ms`);
     } catch (error) {
       this.lastError = error.message;
+      this.emitLog('error', '1-CONEXAO', 'Falha ao iniciar serviço.', { error: error.message });
       await this.stop();
       throw error;
     }
@@ -80,14 +112,21 @@ export class AviatorService {
       this.page = await this.context.newPage();
       this.page.on('console', (msg) => {
         console.log(`🧩 [BrowserConsole:${msg.type()}] ${msg.text()}`);
+        this.emitLog('info', '3-INJECTOR', `BrowserConsole(${msg.type()}): ${msg.text()}`);
       });
       this.page.on('pageerror', (error) => {
         console.error(`🧩 [BrowserPageError] ${error.message}`);
+        this.emitLog('error', '3-INJECTOR', 'Erro de página no browser.', { error: error.message });
       });
       this.page.on('requestfailed', (request) => {
         console.warn(`🧩 [RequestFailed] ${request.failure()?.errorText || 'unknown'} :: ${request.url()}`);
+        this.emitLog('warn', '1-CONEXAO', 'Request failed durante execução do browser.', {
+          error: request.failure()?.errorText || 'unknown',
+          url: request.url()
+        });
       });
       console.log('🌐 Navegador/contexto/página iniciados com sucesso.');
+      this.emitLog('info', '1-CONEXAO', 'Navegador/contexto/página iniciados com sucesso.');
     } catch (error) {
       if (error.message?.includes("Executable doesn't exist") || error.message?.includes('Failed to launch')) {
         throw new Error(
@@ -145,8 +184,10 @@ export class AviatorService {
 
     if (this.page.url().includes('/login')) {
       console.warn('⚠️ Após submit, ainda estamos na rota /login. Verifique credenciais, captcha ou bloqueio.');
+      this.emitLog('warn', '2-LOGIN', 'Submit realizado, porém ainda na rota /login.', { url: this.page.url() });
     } else {
       console.log(`✅ Login enviado com sucesso. URL atual: ${this.page.url()}`);
+      this.emitLog('info', '2-LOGIN', 'Login concluído.', { url: this.page.url() });
     }
   }
 
@@ -161,6 +202,7 @@ export class AviatorService {
 
         if (this.page.url().includes('/aviator')) {
           console.log(`🎰 Página do Aviator aberta (tentativa ${attempt}/${maxAttempts}).`);
+          this.emitLog('info', '2-LOGIN', 'Navegação para Aviator concluída.', { attempt, maxAttempts });
           return;
         }
       } catch (error) {
@@ -171,12 +213,14 @@ export class AviatorService {
         }
 
         console.warn(`⚠️ Navegação abortada para Aviator (tentativa ${attempt}/${maxAttempts}). Tentando novamente...`);
+        this.emitLog('warn', '2-LOGIN', 'Navegação abortada ao abrir Aviator.', { attempt, maxAttempts });
       }
 
       await this.page.waitForTimeout(2000);
 
       if (this.page.url().includes('/aviator')) {
         console.log(`🎰 Página do Aviator aberta (recuperada na tentativa ${attempt}/${maxAttempts}).`);
+        this.emitLog('info', '2-LOGIN', 'Aviator aberto após recuperação.', { attempt, maxAttempts });
         return;
       }
 
@@ -188,6 +232,7 @@ export class AviatorService {
 
       if (this.page.url().includes('/aviator')) {
         console.log(`🎰 Página do Aviator aberta após fallback (tentativa ${attempt}/${maxAttempts}).`);
+        this.emitLog('info', '2-LOGIN', 'Aviator aberto após fallback de window.location.', { attempt, maxAttempts });
         return;
       }
     }
@@ -270,9 +315,13 @@ export class AviatorService {
 
       this.injectorReady = Boolean(injected);
       console.log(`🧩 Injector ${this.injectorReady ? 'ativado' : 'não ativado'} na página do Aviator.`);
+      this.emitLog('info', '3-INJECTOR', 'Injector executado na página do Aviator.', {
+        injectorReady: this.injectorReady
+      });
     } catch (error) {
       this.injectorReady = false;
       console.warn(`⚠️ Falha ao ativar injector: ${error.message}`);
+      this.emitLog('error', '3-INJECTOR', 'Falha ao ativar injector.', { error: error.message });
     }
   }
 
@@ -288,6 +337,10 @@ export class AviatorService {
       if (!snapshot) return [];
       if (snapshot.velas?.length > 0) {
         console.log(`🧩 Injector snapshot recebido | servidor=${snapshot.server} | velas=${snapshot.velas.length}`);
+        this.emitLog('info', '4-CAPTURA', 'Snapshot recebido do injector.', {
+          server: snapshot.server,
+          count: snapshot.velas.length
+        });
       }
       return this.normalizeVelas(snapshot.velas || []);
     } catch (error) {
@@ -331,9 +384,15 @@ export class AviatorService {
       this.lastError = null;
 
       await sendSnapshotToFirebase(snapshot);
+      this.emitLog('info', '4-CAPTURA', 'Snapshot capturado e armazenado.', {
+        totalSnapshots: this.totalSnapshots,
+        ultimaVela: snapshot.ultimaVela,
+        totalVelas: snapshot.totalVelas
+      });
       console.log(`📈 #${this.totalSnapshots} Capturado: ${snapshot.ultimaVela} | total=${snapshot.totalVelas}`);
     } catch (error) {
       this.lastError = error.message;
+      this.emitLog('error', '4-CAPTURA', 'Erro no ciclo de captura.', { error: error.message });
       console.error('❌ Erro no ciclo de captura:', error.message);
     }
   }
@@ -423,6 +482,7 @@ export class AviatorService {
     }
 
     this.page = null;
+    this.emitLog('info', '1-CONEXAO', 'Serviço parado e recursos do browser liberados.');
     console.log('🛑 AviatorService encerrado.');
   }
 }
