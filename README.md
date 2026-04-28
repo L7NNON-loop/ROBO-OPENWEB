@@ -144,7 +144,7 @@ Ponto crítico para evitar erro de Chromium ausente:
 
 - Build Command usa cache custom do Playwright:
   - `PLAYWRIGHT_BROWSERS_PATH=/opt/render/.cache/ms-playwright npm install`
-  - `PLAYWRIGHT_BROWSERS_PATH=/opt/render/.cache/ms-playwright npx playwright install --with-deps chromium`
+  - `PLAYWRIGHT_BROWSERS_PATH=/opt/render/.cache/ms-playwright npx playwright install chromium`
 - Env var:
   - `PLAYWRIGHT_BROWSERS_PATH=/opt/render/.cache/ms-playwright`
 
@@ -178,11 +178,19 @@ Arquivo `vercel.json` incluído para facilitar deploy da API.
 
 ### Erro: `browserType.launch: Executable doesn't exist ... chrome-headless-shell`
 
-Use:
+Para ambiente local Linux (com permissões de sistema):
 
 ```bash
 npx playwright install --with-deps chromium
 ```
+
+No **Render**, use no build:
+
+```bash
+PLAYWRIGHT_BROWSERS_PATH=/opt/render/.cache/ms-playwright npm install && PLAYWRIGHT_BROWSERS_PATH=/opt/render/.cache/ms-playwright npx playwright install chromium
+```
+
+> Motivo: `--with-deps` tenta instalar pacotes de sistema via `su`/root e pode falhar no Render com `Authentication failure`.
 
 Mensagem padronizada no projeto:
 

@@ -5,7 +5,7 @@ services:
     plan: free
     buildCommand: |
       PLAYWRIGHT_BROWSERS_PATH=/opt/render/.cache/ms-playwright npm install &&
-      PLAYWRIGHT_BROWSERS_PATH=/opt/render/.cache/ms-playwright npx playwright install --with-deps chromium
+      PLAYWRIGHT_BROWSERS_PATH=/opt/render/.cache/ms-playwright npx playwright install chromium
     startCommand: npm start
     envVars:
       - key: NODE_ENV
