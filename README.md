@@ -105,6 +105,7 @@ FIREBASE_MEASUREMENT_ID=
 - `SESSION_ENABLED=true`: habilita reaproveitamento de sessão.
 - `SESSION_STATE_PATH=.session/state.json`: caminho do arquivo de sessão (cookies/localStorage) salvo pelo Playwright.
 - Quando a sessão estiver válida, o serviço reutiliza login automaticamente e evita novo login a cada restart.
+- `INJECTOR_ENABLED=true`: habilita o injector no navegador para tentar capturar velas diretamente no contexto da página (com logs no Render via console do browser).
 
 ---
 

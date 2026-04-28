@@ -34,6 +34,7 @@ export const config = {
   browserExecutablePath: process.env.BROWSER_EXECUTABLE_PATH || undefined,
   sessionEnabled: parseBool(process.env.SESSION_ENABLED, true),
   sessionStatePath: process.env.SESSION_STATE_PATH || '.session/state.json',
+  injectorEnabled: parseBool(process.env.INJECTOR_ENABLED, true),
 
   corsOrigin: process.env.CORS_ORIGIN || '*',
 

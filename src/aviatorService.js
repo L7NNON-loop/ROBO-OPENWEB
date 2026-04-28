@@ -29,6 +29,7 @@ export class AviatorService {
     this.lastError = null;
     this.lastCaptureAt = null;
     this.startedAt = null;
+    this.injectorReady = false;
   }
 
   async start() {
@@ -44,6 +45,7 @@ export class AviatorService {
       }
 
       await this.openAviator();
+      await this.setupInjector();
 
       this.startedAt = new Date().toISOString();
       this.pollTimer = setInterval(() => {
@@ -76,6 +78,16 @@ export class AviatorService {
 
       this.context = await this.browser.newContext(contextOptions);
       this.page = await this.context.newPage();
+      this.page.on('console', (msg) => {
+        console.log(`🧩 [BrowserConsole:${msg.type()}] ${msg.text()}`);
+      });
+      this.page.on('pageerror', (error) => {
+        console.error(`🧩 [BrowserPageError] ${error.message}`);
+      });
+      this.page.on('requestfailed', (request) => {
+        console.warn(`🧩 [RequestFailed] ${request.failure()?.errorText || 'unknown'} :: ${request.url()}`);
+      });
+      console.log('🌐 Navegador/contexto/página iniciados com sucesso.');
     } catch (error) {
       if (error.message?.includes("Executable doesn't exist") || error.message?.includes('Failed to launch')) {
         throw new Error(
@@ -121,6 +133,7 @@ export class AviatorService {
       throw new Error('CASINO_USERNAME e CASINO_PASSWORD são obrigatórios para iniciar o login automático.');
     }
 
+    console.log(`🔐 Acessando tela de login: ${config.casinoLoginUrl}`);
     await this.page.goto(config.casinoLoginUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
     await this.page.fill(config.selectorUsername, config.casinoUsername);
@@ -130,7 +143,11 @@ export class AviatorService {
       this.page.click(config.selectorSubmit)
     ]);
 
-    console.log('🔐 Login enviado.');
+    if (this.page.url().includes('/login')) {
+      console.warn('⚠️ Após submit, ainda estamos na rota /login. Verifique credenciais, captcha ou bloqueio.');
+    } else {
+      console.log(`✅ Login enviado com sucesso. URL atual: ${this.page.url()}`);
+    }
   }
 
   async openAviator() {
@@ -178,9 +195,111 @@ export class AviatorService {
     throw new Error(`Não foi possível abrir a página do Aviator após ${maxAttempts} tentativas.`);
   }
 
+  async setupInjector() {
+    if (!config.injectorEnabled) {
+      console.log('ℹ️ Injector desativado por configuração (INJECTOR_ENABLED=false).');
+      this.injectorReady = false;
+      return;
+    }
+
+    try {
+      const injected = await this.page.evaluate(() => {
+        const velaRegex = /^\d+\.\d+x$/i;
+        const fallbackSelectors = [
+          'div.payout[appcoloredmultiplier]',
+          'div[class*="payout"]',
+          'div[style*="rgb(52, 180, 255)"], div[style*="rgb(145, 62, 248)"], div[style*="rgb(192, 23, 180)"]',
+          'div[class*="payouts-block"] div[style*="color"]',
+          '[class*="stats"] div[style*="rgb"]'
+        ];
+
+        if (window.__aviatorInjector?.timer) {
+          clearInterval(window.__aviatorInjector.timer);
+        }
+
+        window.__aviatorInjector = {
+          selectorVelas: window.SELETOR_VELAS || 'div.payout[appcoloredmultiplier]',
+          lastVelas: [],
+          lastUpdatedAt: null,
+          server: window.location.hostname,
+          getSnapshot() {
+            return {
+              server: this.server,
+              velas: this.lastVelas,
+              lastUpdatedAt: this.lastUpdatedAt
+            };
+          }
+        };
+
+        const extract = () => {
+          const allSelectors = [
+            window.__aviatorInjector.selectorVelas,
+            ...fallbackSelectors.filter((item) => item !== window.__aviatorInjector.selectorVelas)
+          ];
+
+          let velas = [];
+          for (const selector of allSelectors) {
+            try {
+              const elements = Array.from(document.querySelectorAll(selector));
+              const texts = elements
+                .map((item) => (item.textContent || '').trim())
+                .filter((text) => velaRegex.test(text));
+              if (texts.length > 0) {
+                velas = texts;
+                break;
+              }
+            } catch {
+              // ignora selector inválido
+            }
+          }
+
+          if (velas.length === 0) {
+            velas = Array.from(document.querySelectorAll('div'))
+              .map((item) => (item.textContent || '').trim())
+              .filter((text) => velaRegex.test(text));
+          }
+
+          window.__aviatorInjector.lastVelas = Array.from(new Set(velas));
+          window.__aviatorInjector.lastUpdatedAt = new Date().toISOString();
+        };
+
+        extract();
+        window.__aviatorInjector.timer = setInterval(extract, 3000);
+        return true;
+      });
+
+      this.injectorReady = Boolean(injected);
+      console.log(`🧩 Injector ${this.injectorReady ? 'ativado' : 'não ativado'} na página do Aviator.`);
+    } catch (error) {
+      this.injectorReady = false;
+      console.warn(`⚠️ Falha ao ativar injector: ${error.message}`);
+    }
+  }
+
+  async readInjectorVelas() {
+    if (!this.injectorReady) return [];
+
+    try {
+      const snapshot = await this.page.evaluate(() => {
+        if (!window.__aviatorInjector?.getSnapshot) return null;
+        return window.__aviatorInjector.getSnapshot();
+      });
+
+      if (!snapshot) return [];
+      if (snapshot.velas?.length > 0) {
+        console.log(`🧩 Injector snapshot recebido | servidor=${snapshot.server} | velas=${snapshot.velas.length}`);
+      }
+      return this.normalizeVelas(snapshot.velas || []);
+    } catch (error) {
+      console.warn(`⚠️ Não foi possível ler snapshot do injector: ${error.message}`);
+      return [];
+    }
+  }
+
   async captureCycle() {
     try {
-      const velas = await this.extractVelas();
+      const injectedVelas = await this.readInjectorVelas();
+      const velas = injectedVelas.length > 0 ? injectedVelas : await this.extractVelas();
       if (velas.length === 0) return;
 
       const snapshotHash = velas.join(',');
