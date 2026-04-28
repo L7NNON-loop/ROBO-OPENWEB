@@ -143,10 +143,10 @@ Arquivo `render.yaml` já incluído.
 Ponto crítico para evitar erro de Chromium ausente:
 
 - Build Command usa cache custom do Playwright:
-  - `PLAYWRIGHT_BROWSERS_PATH=/opt/render/.cache/ms-playwright npm install`
-  - `PLAYWRIGHT_BROWSERS_PATH=/opt/render/.cache/ms-playwright npx playwright install chromium`
+  - `PLAYWRIGHT_BROWSERS_PATH=/opt/render/project/.cache/ms-playwright npm install`
+  - `PLAYWRIGHT_BROWSERS_PATH=/opt/render/project/.cache/ms-playwright npx playwright install chromium`
 - Env var:
-  - `PLAYWRIGHT_BROWSERS_PATH=/opt/render/.cache/ms-playwright`
+  - `PLAYWRIGHT_BROWSERS_PATH=/opt/render/project/.cache/ms-playwright`
 
 Após deploy, configure as variáveis `.env` equivalentes no painel do Render.
 
@@ -187,7 +187,7 @@ npx playwright install --with-deps chromium
 No **Render**, use no build:
 
 ```bash
-PLAYWRIGHT_BROWSERS_PATH=/opt/render/.cache/ms-playwright npm install && PLAYWRIGHT_BROWSERS_PATH=/opt/render/.cache/ms-playwright npx playwright install chromium
+PLAYWRIGHT_BROWSERS_PATH=/opt/render/project/.cache/ms-playwright npm install && PLAYWRIGHT_BROWSERS_PATH=/opt/render/project/.cache/ms-playwright npx playwright install chromium
 ```
 
 > Motivo: `--with-deps` tenta instalar pacotes de sistema via `su`/root e pode falhar no Render com `Authentication failure`.
