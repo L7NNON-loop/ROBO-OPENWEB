@@ -1,10 +1,14 @@
 import cors from 'cors';
 import express from 'express';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { config } from './config.js';
 import { AviatorService } from './aviatorService.js';
 import { initFirebase } from './firebase.js';
 
 const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const debugLogs = [];
 const MAX_DEBUG_LOGS = 1000;
 const logSubscribers = new Set();
@@ -39,6 +43,7 @@ const aviatorService = new AviatorService({
 
 app.use(cors({ origin: config.corsOrigin === '*' ? true : config.corsOrigin }));
 app.use(express.json());
+app.use('/public', express.static(path.join(__dirname, 'public')));
 
 app.get('/api/velas', (req, res) => {
   const limit = req.query.limit ?? 50;
@@ -65,7 +70,12 @@ app.get('/api/docs', (req, res) => {
       sitesRequisicoes: 'GET /api/sites/requisicoes',
       debugLogs: 'GET /debug/logs?limit=200',
       debugLogsStream: 'GET /debug/logs/stream (SSE)',
-      velasStream: 'GET /api/velas/stream (SSE)'
+      velasStream: 'GET /api/velas/stream (SSE)',
+      webviewPage: 'GET /webview',
+      webviewState: 'GET /webview/state',
+      webviewOpen: 'POST /webview/open',
+      webviewExec: 'POST /webview/exec',
+      webviewSessionSave: 'POST /webview/session/save'
     }
   });
 });
@@ -129,6 +139,50 @@ app.get('/api/velas/stream', (req, res) => {
     clearInterval(heartbeat);
     velaSubscribers.delete(res);
   });
+});
+
+app.get('/webview', (req, res) => {
+  return res.sendFile(path.join(__dirname, 'public', 'webview.html'));
+});
+
+app.get('/webview/state', async (req, res) => {
+  try {
+    const data = await aviatorService.getWebviewState();
+    return res.json({ ok: true, data });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.post('/webview/open', async (req, res) => {
+  try {
+    const { url } = req.body || {};
+    if (!url) return res.status(400).json({ ok: false, error: 'Campo "url" é obrigatório.' });
+    const data = await aviatorService.openCustomUrl(url);
+    return res.json({ ok: true, data });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.post('/webview/exec', async (req, res) => {
+  try {
+    const { script } = req.body || {};
+    if (!script) return res.status(400).json({ ok: false, error: 'Campo "script" é obrigatório.' });
+    const data = await aviatorService.executeConsoleScript(script);
+    return res.json({ ok: true, data });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.post('/webview/session/save', async (req, res) => {
+  try {
+    const data = await aviatorService.saveSessionNow();
+    return res.json({ ok: true, data });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
 });
 
 const server = app.listen(config.port, async () => {

@@ -456,6 +456,57 @@ export class AviatorService {
     return this.history.slice(0, safeLimit);
   }
 
+  async openCustomUrl(url) {
+    if (!this.page) {
+      throw new Error('Página do browser não está pronta. Inicie o serviço primeiro.');
+    }
+
+    await this.page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    this.emitLog('info', '1-CONEXAO', 'Webview navegou para URL customizada.', { url });
+    return { ok: true, url: this.page.url() };
+  }
+
+  async executeConsoleScript(script) {
+    if (!this.page) {
+      throw new Error('Página do browser não está pronta. Inicie o serviço primeiro.');
+    }
+
+    const result = await this.page.evaluate(async (scriptCode) => {
+      // eslint-disable-next-line no-eval
+      const execution = eval(scriptCode);
+      return await Promise.resolve(execution);
+    }, script);
+
+    this.emitLog('info', '3-INJECTOR', 'Script executado manualmente via Webview/Console.');
+    return result;
+  }
+
+  async saveSessionNow() {
+    await this.persistSession();
+    this.emitLog('info', '2-LOGIN', 'Sessão salva manualmente pela Webview.');
+    return {
+      ok: true,
+      sessionStatePath: config.sessionStatePath
+    };
+  }
+
+  async getWebviewState() {
+    if (!this.page) {
+      return {
+        ready: false,
+        url: null,
+        title: null
+      };
+    }
+
+    const title = await this.page.title().catch(() => null);
+    return {
+      ready: true,
+      url: this.page.url(),
+      title
+    };
+  }
+
   getStatus() {
     return {
       running: this.isRunning,

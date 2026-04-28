@@ -167,6 +167,16 @@ const velasSource = new EventSource('https://SEU_SERVIDOR/api/velas/stream');
 velasSource.onmessage = (event) => console.log('nova vela', JSON.parse(event.data));
 ```
 
+### Webview + Console Injector
+Nova tela para controle manual:
+- `GET /webview` (abre UI),
+- `POST /webview/open` (navega para URL),
+- `POST /webview/exec` (executa script colado),
+- `POST /webview/session/save` (salva sessão/cookies),
+- `GET /webview/state` (estado atual da página).
+
+Use essa tela para colar o script de captura no contexto da página e salvar sessão para reaproveitar login.
+
 ---
 
 ## 5) Deploy no Render
