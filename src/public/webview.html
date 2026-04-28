@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Webview Injector</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #0f172a; color: #e2e8f0; margin: 0; padding: 20px; }
+    .card { background: #111827; border: 1px solid #334155; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+    input, textarea, button { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #475569; background: #0b1220; color: #e2e8f0; }
+    textarea { min-height: 220px; font-family: monospace; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    button { cursor: pointer; background: #2563eb; border: none; }
+    pre { white-space: pre-wrap; background: #020617; padding: 12px; border-radius: 8px; max-height: 280px; overflow: auto; }
+  </style>
+</head>
+<body>
+  <h1>Webview + Console Injector</h1>
+
+  <div class="card">
+    <h3>1) Abrir URL no browser do bot</h3>
+    <input id="url" placeholder="https://megagamelive.com/aviator" />
+    <div class="row" style="margin-top:10px;">
+      <button id="openBtn">Abrir URL</button>
+      <button id="stateBtn">Ver estado atual</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>2) Colar script do console e executar</h3>
+    <textarea id="script" placeholder="Cole aqui o script completo..."></textarea>
+    <div class="row" style="margin-top:10px;">
+      <button id="execBtn">Executar script</button>
+      <button id="saveSessionBtn">Guardar sessão (cookies)</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Resultado</h3>
+    <pre id="result">Aguardando ação...</pre>
+  </div>
+
+  <script>
+    const result = document.getElementById('result');
+    const log = (obj) => {
+      result.textContent = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
+    };
+
+    document.getElementById('openBtn').onclick = async () => {
+      const url = document.getElementById('url').value.trim();
+      const res = await fetch('/webview/open', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url })
+      });
+      log(await res.json());
+    };
+
+    document.getElementById('stateBtn').onclick = async () => {
+      const res = await fetch('/webview/state');
+      log(await res.json());
+    };
+
+    document.getElementById('execBtn').onclick = async () => {
+      const script = document.getElementById('script').value;
+      const res = await fetch('/webview/exec', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ script })
+      });
+      log(await res.json());
+    };
+
+    document.getElementById('saveSessionBtn').onclick = async () => {
+      const res = await fetch('/webview/session/save', { method: 'POST' });
+      log(await res.json());
+    };
+  </script>
+</body>
+</html>
