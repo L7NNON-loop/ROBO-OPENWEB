@@ -1,0 +1,21 @@
+{
+  "name": "aviator-auto-script",
+  "version": "1.0.0",
+  "description": "Captura automática de velas do Aviator com Playwright + Express + Firebase",
+  "type": "module",
+  "main": "src/index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "firebase": "^11.9.1",
+    "playwright": "^1.53.0"
+  }
+}
