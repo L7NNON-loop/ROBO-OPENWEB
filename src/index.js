@@ -7,6 +7,8 @@ import { initFirebase } from './firebase.js';
 const app = express();
 const debugLogs = [];
 const MAX_DEBUG_LOGS = 1000;
+const logSubscribers = new Set();
+const velaSubscribers = new Set();
 
 const appendDebugLog = (entry) => {
   debugLogs.unshift(entry);
@@ -16,9 +18,24 @@ const appendDebugLog = (entry) => {
 
   const printer = entry.level === 'error' ? console.error : entry.level === 'warn' ? console.warn : console.log;
   printer(`🧾 [${entry.stage}] ${entry.message}`);
+
+  const payload = `data: ${JSON.stringify(entry)}\n\n`;
+  for (const res of logSubscribers) {
+    res.write(payload);
+  }
 };
 
-const aviatorService = new AviatorService({ logHandler: appendDebugLog });
+const broadcastVela = (entry) => {
+  const payload = `data: ${JSON.stringify(entry)}\n\n`;
+  for (const res of velaSubscribers) {
+    res.write(payload);
+  }
+};
+
+const aviatorService = new AviatorService({
+  logHandler: appendDebugLog,
+  snapshotHandler: broadcastVela
+});
 
 app.use(cors({ origin: config.corsOrigin === '*' ? true : config.corsOrigin }));
 app.use(express.json());
@@ -28,7 +45,8 @@ app.get('/api/velas', (req, res) => {
   return res.json({
     ok: true,
     limit: Number(limit),
-    data: aviatorService.getVelas(limit)
+    data: aviatorService.getVelas(limit),
+    logs: debugLogs.slice(0, 20)
   });
 });
 
@@ -45,7 +63,9 @@ app.get('/api/docs', (req, res) => {
       status: 'GET /api/status',
       docs: 'GET /api/docs',
       sitesRequisicoes: 'GET /api/sites/requisicoes',
-      debugLogs: 'GET /debug/logs?limit=200'
+      debugLogs: 'GET /debug/logs?limit=200',
+      debugLogsStream: 'GET /debug/logs/stream (SSE)',
+      velasStream: 'GET /api/velas/stream (SSE)'
     }
   });
 });
@@ -70,6 +90,44 @@ app.get('/debug/logs', (req, res) => {
     ok: true,
     total: debugLogs.length,
     data: debugLogs.slice(0, safeLimit)
+  });
+});
+
+app.get('/debug/logs/stream', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  res.write(`event: connected\ndata: ${JSON.stringify({ ok: true, channel: 'logs' })}\n\n`);
+  logSubscribers.add(res);
+
+  const heartbeat = setInterval(() => {
+    res.write(`event: heartbeat\ndata: ${Date.now()}\n\n`);
+  }, 15000);
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    logSubscribers.delete(res);
+  });
+});
+
+app.get('/api/velas/stream', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  res.write(`event: connected\ndata: ${JSON.stringify({ ok: true, channel: 'velas' })}\n\n`);
+  velaSubscribers.add(res);
+
+  const heartbeat = setInterval(() => {
+    res.write(`event: heartbeat\ndata: ${Date.now()}\n\n`);
+  }, 15000);
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    velaSubscribers.delete(res);
   });
 });
 

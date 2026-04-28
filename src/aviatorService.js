@@ -31,6 +31,7 @@ export class AviatorService {
     this.startedAt = null;
     this.injectorReady = false;
     this.logHandler = options.logHandler || null;
+    this.snapshotHandler = options.snapshotHandler || null;
     this.sessionId = null;
   }
 
@@ -384,6 +385,12 @@ export class AviatorService {
       this.lastError = null;
 
       await sendSnapshotToFirebase(snapshot);
+      if (this.snapshotHandler) {
+        this.snapshotHandler({
+          sessionId: this.sessionId,
+          snapshot
+        });
+      }
       this.emitLog('info', '4-CAPTURA', 'Snapshot capturado e armazenado.', {
         totalSnapshots: this.totalSnapshots,
         ultimaVela: snapshot.ultimaVela,

@@ -151,6 +151,22 @@ Logs internos do bot organizados por etapas:
 curl "http://localhost:3000/debug/logs?limit=200"
 ```
 
+### GET `/debug/logs/stream` (SSE)
+Atualiza logs em tempo real sem recarregar o navegador.
+
+```javascript
+const logsSource = new EventSource('https://SEU_SERVIDOR/debug/logs/stream');
+logsSource.onmessage = (event) => console.log('novo log', JSON.parse(event.data));
+```
+
+### GET `/api/velas/stream` (SSE)
+Atualiza snapshots de velas em tempo real sem recarregar a página.
+
+```javascript
+const velasSource = new EventSource('https://SEU_SERVIDOR/api/velas/stream');
+velasSource.onmessage = (event) => console.log('nova vela', JSON.parse(event.data));
+```
+
 ---
 
 ## 5) Deploy no Render
