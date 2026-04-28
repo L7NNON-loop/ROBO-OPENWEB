@@ -196,9 +196,17 @@ Mensagem padronizada no projeto:
 
 **Chromium do Playwright não foi instalado no ambiente. Execute: npx playwright install --with-deps chromium**
 
+### Erro: `page.goto: net::ERR_ABORTED` ao abrir `/aviator`
+- A plataforma pode abortar navegação direta por redirecionamento/anti-bot/estado de sessão.
+- Nesta versão, o serviço já tenta novamente automaticamente (com fallback de `window.location.href`).
+- Se persistir, confirme:
+  - credenciais corretas (`CASINO_USERNAME`/`CASINO_PASSWORD`),
+  - se o login realmente concluiu,
+  - se a sua região/IP consegue abrir `https://megagamelive.com/aviator` manualmente.
+
 ### Sem velas capturadas
 - Ajuste `SELECTOR_VELAS` no `.env`.
-- O serviço tenta fallback automático de seletores e varredura por regex `^\d+\.\d+x$`.
+- O serviço tenta fallback automático de seletores e varredura por regex `^\d+\.\d+x$`, incluindo busca dentro de iframes/frames da página.
 - Confirme se o login foi efetuado e a rota do Aviator carregou corretamente.
 
 ---
